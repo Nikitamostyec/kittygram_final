@@ -1,140 +1,40 @@
-name: Kittygram Workflow
+passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd /home/${{ secrets.USER }}/kittygram/
+            
+            if [ ! -f .env ]; then
+              cp .env.example .env
+            fi
+            
+            echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            
+            docker compose -f docker-compose.production.yml pull
+            docker compose -f docker-compose.production.yml down
+            docker compose -f docker-compose.production.yml up -d
+            docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
+            docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+            docker compose -f docker-compose.production.yml exec -T backend cp -r /app/static/. /backend_static/static/
+            docker image prune -f
 
-on:
-  push:
-    branches:
-      - main
-
-env:
-  # Укажите свои значения
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-  HOST: ${{ secrets.HOST }}
-  USER: ${{ secrets.USER }}
-  SSH_KEY: ${{ secrets.SSH_KEY }}
-  SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
-  TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
-  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-
-jobs:
-  tests:
-    name: Run tests
+  send_message:
+    name: Send Telegram message
     runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
     
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-      
-      # Тесты бэкенда
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Send success message
+        uses: appleboy/telegram-action@master
         with:
-          python-version: 3.9
-      
-      - name: Install dependencies
-        run: |
-          cd backend/
-          pip install flake8 pep8-naming flake8-broken-line flake8-return flake8-isort
-          pip install -r requirements.txt
-      
-      - name: Test with flake8
-        run: |
-          cd backend/
-          python -m flake8
-      
-      - name: Run Django tests
-        run: |
-          cd backend/
-          python manage.py test
-      
-      # Тесты фронтенда
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      
-      - name: Install frontend dependencies
-        run: |
-          cd frontend/
-          npm ci
-      
-      - name: Run frontend tests
-        run: |
-          cd frontend/
-          npm test
-
-  build_and_push_to_docker_hub:
-    name: Build and push Docker images
-    runs-on: ubuntu-latest
-    needs: tests
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      
-      # Бэкенд
-      - name: Build and push backend image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/kittygram_backend:latest
-      
-      # Фронтенд
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/kittygram_frontend:latest
-      
-      # Nginx/Gateway
-      - name: Build and push gateway image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./nginx
-          file: ./nginx/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/kittygram_gateway:latest
-
-  deploy:
-    name: Deploy to server
-    runs-on: ubuntu-latest
-    needs: build_and_push_to_docker_hub
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-      
-      - name: Copy docker-compose.yml to server
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "docker-compose.production.yml"
-          target: "/home/${{ secrets.USER }}/kittygram/"
-      
-      - name: Copy .env.example to server
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          key: ${{ secrets.SSH_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: ".env.example"
-          target: "/home/${{ secrets.USER }}/kittygram/"
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            ✅ Деплой Kittygram успешно завершен!
+            
+            Репозиторий: ${{ github.repository }}
+            Ветка: ${{ github.ref_name }}
+            Коммит: ${{ github.sha }}
+            Автор: ${{ github.actor }}
+            URL: http://${{ secrets.HOST }}
+            
+            Время: ${{ github.event.head_commit.timestamp }}
