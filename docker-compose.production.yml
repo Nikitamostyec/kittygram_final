@@ -30,6 +30,7 @@ services:
       - static:/static
   gateway:
     depends_on:
+      - frontend
       - backend
     image: nikita2287/kittygram_gateway:latest
     env_file: .env
