@@ -3,10 +3,6 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
-
-if not os.getenv("env"):
-    raise TypeError("'env' variable not found in .env file")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
