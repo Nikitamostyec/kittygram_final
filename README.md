@@ -58,58 +58,44 @@ POSTGRES_PASSWORD=strong_password
 DB_HOST=db
 DB_PORT=5432
 
-### Как запустить проект:
+## Установка и запуск через Docker
 
-Клонировать репозиторий и перейти в него в командной строке:
+Проект разворачивается в Docker-контейнерах.
 
-```
-git clone https://github.com/yandex-praktikum/kittygram_backend.git
-```
+### Предварительные требования
+- Docker
+- Docker Compose
 
-```
-cd kittygram_backend
-```
+### Запуск проекта
 
-Cоздать и активировать виртуальное окружение:
+1. Клонируйте репозиторий:
 
-```
-python3 -m venv env
-```
+   git clone https://github.com/nikitamostyec/kittygram_actions.git
+   cd kittygram_actions
 
-* Если у вас Linux/macOS
+1. Создайте файл .env с переменными окружения:
 
-    ```
-    source env/bin/activate
-    ```
+   SECRET_KEY=ваш_секретный_ключ
+   DEBUG=False
+   DB_ENGINE=django.db.backends.postgresql
+   DB_NAME=postgres
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=postgres
+   DB_HOST=db
+   DB_PORT=5432
 
-* Если у вас windows
+2. Запустите контейнеры:
 
-    ```
-    source env/scripts/activate
-    ```
+   docker-compose -f docker-compose.production.yml up -d
 
-```
-python3 -m pip install --upgrade pip
-```
+3. Выполните миграции:
 
-Установить зависимости из файла requirements.txt:
+   docker-compose -f docker-compose.production.yml exec backend python manage.py migrate
 
-```
-pip install -r requirements.txt
-```
-
-Выполнить миграции:
-
-```
-python3 manage.py migrate
-```
-
-Запустить проект:
-
-```
-python3 manage.py runserver
-```
-
+4. Соберите статику:
+   
+bash
+   docker-compose -f docker-compose.production.yml exec backend python manage.py collectstatic --no-input
 # Автор
 Мостынец Никита Витальевич
 GitHub: mostyecnikita
